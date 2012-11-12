@@ -8,8 +8,7 @@ Developers list: dev@maven.apache.org
 
 This is a fork of Apache Maven Plugins adding the following functionality:
 
-# Dependency to custom (forked) `doxia-doc-renderer` supporting generated TOC for FO.
-# New `includeAllDescriptors` configuration to automatically build PDFs for all 
-  `*.pdf.xml` descriptors in the configured `siteDirectory`.
-# Adds a `fop-userconfig.xml` that includes all system fonts to make them available to the FO stylesheet.
+* Dependency to custom (forked) `doxia-doc-renderer` supporting generated TOC for FO.
+* New `includeAllDescriptors` configuration to automatically build PDFs for all `*.pdf.xml` descriptors in the configured `siteDirectory`.
+* Adds a `fop-userconfig.xml` that includes all system fonts to make them available to the FO stylesheet.
 
