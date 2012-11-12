@@ -19,6 +19,24 @@ package org.apache.maven.plugins.pdf;
  * under the License.
  */
 
+import java.io.File;
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import javax.swing.text.AttributeSet;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.factory.ArtifactFactory;
 import org.apache.maven.artifact.repository.ArtifactRepository;
@@ -89,26 +107,9 @@ import org.codehaus.plexus.util.WriterFactory;
 import org.codehaus.plexus.util.xml.XmlStreamReader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
-import javax.swing.text.AttributeSet;
-import java.io.File;
-import java.io.IOException;
-import java.io.Reader;
-import java.io.StringReader;
-import java.io.StringWriter;
-import java.io.Writer;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
 /**
  * Generates a PDF document for a project.
- *
+ * 
  * @author ltheussl
  * @version $Id$
  */
@@ -144,8 +145,8 @@ public class PdfMojo
     private PdfRenderer itextRenderer;
 
     /**
-     * A comma separated list of locales supported by Maven.
-     * The first valid token will be the default Locale for this instance of the Java Virtual Machine.
+     * A comma separated list of locales supported by Maven. The first valid token will be the default Locale for this
+     * instance of the Java Virtual Machine.
      */
     @Parameter( property = "locales" )
     private String locales;
@@ -164,7 +165,7 @@ public class PdfMojo
 
     /**
      * The Plugin manager instance used to resolve Plugin descriptors.
-     *
+     * 
      * @since 1.1
      */
     @Component( role = PluginManager.class )
@@ -172,7 +173,7 @@ public class PdfMojo
 
     /**
      * Doxia.
-     *
+     * 
      * @since 1.1
      */
     @Component
@@ -180,7 +181,7 @@ public class PdfMojo
 
     /**
      * Factory for creating artifact objects.
-     *
+     * 
      * @since 1.1
      */
     @Component
@@ -188,7 +189,7 @@ public class PdfMojo
 
     /**
      * Project builder.
-     *
+     * 
      * @since 1.1
      */
     @Component
@@ -206,7 +207,7 @@ public class PdfMojo
 
     /**
      * The Maven Settings.
-     *
+     * 
      * @since 1.1
      */
     @Component
@@ -214,7 +215,7 @@ public class PdfMojo
 
     /**
      * The current build session instance.
-     *
+     * 
      * @since 1.1
      */
     @Component
@@ -228,7 +229,7 @@ public class PdfMojo
 
     /**
      * Directory containing generated sources for apt, fml and xdoc docs.
-     *
+     * 
      * @since 1.1
      */
     @Parameter( defaultValue = "${project.build.directory}/generated-site", required = true )
@@ -253,6 +254,16 @@ public class PdfMojo
     private File docDescriptor;
 
     /**
+     * Parameter to include all *pdf.xml files and generate PDFs for them automatically. Added to reduce the required
+     * amount of configuration.
+     * 
+     * @since 1.4
+     */
+    // Customized by Samuel Sjoberg
+    @Parameter( defaultValue = "false" )
+    private boolean includeAllDescriptors;
+
+    /**
      * Identifies the framework to use for pdf generation: either "fo" (default) or "itext".
      */
     @Parameter( property = "implementation", defaultValue = "fo", required = true )
@@ -266,7 +277,7 @@ public class PdfMojo
 
     /**
      * The remote repositories where artifacts are located.
-     *
+     * 
      * @since 1.1
      */
     @Parameter( property = "project.remoteArtifactRepositories" )
@@ -286,31 +297,28 @@ public class PdfMojo
     private String pluginVersion;
 
     /**
-     * If <code>true</false>, generate all Maven reports defined in <code>${project.reporting}</code> and append
-     * them as a new entry in the TOC (Table Of Contents).
-     * <b>Note</b>: Including the report generation could fail the PDF generation or increase the build time.
-     *
+     * If <code>true</false>, generate all Maven reports defined in <code>${project.reporting}</code> and append them as
+     * a new entry in the TOC (Table Of Contents). <b>Note</b>: Including the report generation could fail the PDF
+     * generation or increase the build time.
+     * 
      * @since 1.1
      */
     @Parameter( property = "includeReports", defaultValue = "true" )
     private boolean includeReports;
 
     /**
-     * Generate a TOC (Table Of Content) for all items defined in the &lt;toc/&gt; element from the document descriptor.
-     * <br/>
+     * Generate a TOC (Table Of Content) for all items defined in the &lt;toc/&gt; element from the document descriptor. <br/>
      * Possible values are: 'none', 'start' and 'end'.
-     *
+     * 
      * @since 1.1
      */
     @Parameter( property = "generateTOC", defaultValue = "start" )
     private String generateTOC;
 
     /**
-     * Whether to validate xml input documents.
-     * If set to true, <strong>all</strong> input documents in xml format
-     * (in particular xdoc and fml) will be validated and any error will
-     * lead to a build failure.
-     *
+     * Whether to validate xml input documents. If set to true, <strong>all</strong> input documents in xml format (in
+     * particular xdoc and fml) will be validated and any error will lead to a build failure.
+     * 
      * @since 1.2
      */
     @Parameter( property = "validate", defaultValue = "false" )
@@ -322,6 +330,7 @@ public class PdfMojo
 
     /**
      * The current document Renderer.
+     * 
      * @see #implementation
      */
     private DocumentRenderer docRenderer;
@@ -343,21 +352,21 @@ public class PdfMojo
 
     /**
      * The temp Site dir to have all site and generated-site files.
-     *
+     * 
      * @since 1.1
      */
     private File siteDirectoryTmp;
 
     /**
      * The temp Generated Site dir to have generated reports by this plugin.
-     *
+     * 
      * @since 1.1
      */
     private File generatedSiteDirectoryTmp;
 
     /**
      * A map of generated MavenReport list using locale as key.
-     *
+     * 
      * @since 1.1
      */
     private Map generatedMavenReports;
@@ -367,11 +376,46 @@ public class PdfMojo
     // ----------------------------------------------------------------------
 
     /** {@inheritDoc} */
+    @SuppressWarnings( "unchecked" )
     public void execute()
         throws MojoExecutionException, MojoFailureException
     {
         init();
 
+        if ( includeAllDescriptors )
+        {
+            List<File> descriptors;
+            try
+            {
+                descriptors = (List<File>) FileUtils.getFiles( siteDirectory, "*.pdf.xml", null );
+            }
+            catch ( IOException e )
+            {
+                throw new MojoFailureException( "Failed to match '*.pdf.xml' files in '" + siteDirectory.getPath()
+                    + "'.", e );
+            }
+            for ( File descriptor : descriptors )
+            {
+                getLog().info( "Generate from '" + descriptor + "'." );
+                docDescriptor = descriptor;
+                executeInternal();
+            }
+
+        }
+        else
+        {
+            executeInternal();
+        }
+
+    }
+
+    // ----------------------------------------------------------------------
+    // Private methods
+    // ----------------------------------------------------------------------
+
+    private void executeInternal()
+        throws MojoExecutionException, MojoFailureException
+    {
         try
         {
             generatePdf();
@@ -393,10 +437,6 @@ public class PdfMojo
         }
     }
 
-    // ----------------------------------------------------------------------
-    // Private methods
-    // ----------------------------------------------------------------------
-
     /**
      * Init and validate parameters
      */
@@ -412,17 +452,14 @@ public class PdfMojo
         }
         else
         {
-            getLog().warn( "Invalid 'implementation' parameter: '" + implementation
-                    + "', using 'fo' as default." );
+            getLog().warn( "Invalid 'implementation' parameter: '" + implementation + "', using 'fo' as default." );
 
             this.docRenderer = foRenderer;
         }
 
-        if ( !( "none".equalsIgnoreCase( generateTOC )
-                || "start".equalsIgnoreCase( generateTOC ) || "end".equalsIgnoreCase( generateTOC ) ) )
+        if ( !( "none".equalsIgnoreCase( generateTOC ) || "start".equalsIgnoreCase( generateTOC ) || "end".equalsIgnoreCase( generateTOC ) ) )
         {
-            getLog().warn( "Invalid 'generateTOC' parameter: '" + generateTOC
-                    + "', using 'start' as default." );
+            getLog().warn( "Invalid 'generateTOC' parameter: '" + generateTOC + "', using 'start' as default." );
 
             this.generateTOC = "start";
         }
@@ -430,7 +467,7 @@ public class PdfMojo
 
     /**
      * Copy the generated PDF to outputDirectory.
-     *
+     * 
      * @throws MojoExecutionException if any
      * @throws IOException if any
      * @since 1.1
@@ -453,7 +490,7 @@ public class PdfMojo
         {
             final Locale locale = (Locale) iterator.next();
 
-            File generatedPdfSource = new File( getLocaleDirectory( workingDirectory, locale), outputName );
+            File generatedPdfSource = new File( getLocaleDirectory( workingDirectory, locale ), outputName );
 
             if ( !generatedPdfSource.exists() )
             {
@@ -461,7 +498,7 @@ public class PdfMojo
                 continue;
             }
 
-            File generatedPdfDest = new File( getLocaleDirectory( outputDirectory, locale), outputName );
+            File generatedPdfDest = new File( getLocaleDirectory( outputDirectory, locale ), outputName );
 
             FileUtils.copyFile( generatedPdfSource, generatedPdfDest );
             generatedPdfSource.delete();
@@ -470,7 +507,7 @@ public class PdfMojo
 
     /**
      * Generate the PDF.
-     *
+     * 
      * @throws MojoExecutionException if any
      * @throws IOException if any
      * @since 1.1
@@ -550,11 +587,10 @@ public class PdfMojo
     }
 
     /**
-     * Copy all site and generated-site files in the tmpSiteDirectory.
-     * <br/>
-     * <b>Note</b>: ignore copying of <code>generated-site</code> files if they already exist in the
-     * <code>site</code> dir.
-     *
+     * Copy all site and generated-site files in the tmpSiteDirectory. <br/>
+     * <b>Note</b>: ignore copying of <code>generated-site</code> files if they already exist in the <code>site</code>
+     * dir.
+     * 
      * @param tmpSiteDir not null
      * @throws IOException if any
      * @since 1.1
@@ -573,8 +609,8 @@ public class PdfMojo
 
         // Remove SCM files
         List files =
-            FileUtils.getFileAndDirectoryNames( tmpSiteDir, FileUtils.getDefaultExcludesAsString(), null, true,
-                                                true, true, true );
+            FileUtils.getFileAndDirectoryNames( tmpSiteDir, FileUtils.getDefaultExcludesAsString(), null, true, true,
+                                                true, true );
         for ( final Iterator it = files.iterator(); it.hasNext(); )
         {
             final File file = new File( it.next().toString() );
@@ -594,7 +630,7 @@ public class PdfMojo
 
     /**
      * Copy the from site dir to the to dir.
-     *
+     * 
      * @param from not null
      * @param to not null
      * @throws IOException if any
@@ -661,9 +697,9 @@ public class PdfMojo
     }
 
     /**
-     * Constructs a DocumentModel for the current project. The model is either read from
-     * a descriptor file, if it exists, or constructed from information in the pom and site.xml.
-     *
+     * Constructs a DocumentModel for the current project. The model is either read from a descriptor file, if it
+     * exists, or constructed from information in the pom and site.xml.
+     * 
      * @param locale not null
      * @return DocumentModel.
      * @throws MojoExecutionException if any
@@ -675,7 +711,8 @@ public class PdfMojo
         if ( docDescriptor.exists() )
         {
             DocumentModel doc = getDocumentModelFromDescriptor( locale );
-            // TODO: descriptor model should get merged into default model, see MODELLO-63
+            // TODO: descriptor model should get merged into default model, see
+            // MODELLO-63
 
             appendGeneratedReports( doc, locale );
 
@@ -698,7 +735,7 @@ public class PdfMojo
 
     /**
      * Read a DocumentModel from a file.
-     *
+     * 
      * @param locale used to set the language.
      * @return the DocumentModel read from the configured document descriptor.
      * @throws org.apache.maven.plugin.MojoExecutionException if the model could not be read.
@@ -710,8 +747,7 @@ public class PdfMojo
 
         try
         {
-            model =
-                new DocumentDescriptorReader( project, getLog() ).readAndFilterDocumentDescriptor( docDescriptor );
+            model = new DocumentDescriptorReader( project, getLog() ).readAndFilterDocumentDescriptor( docDescriptor );
         }
         catch ( XmlPullParserException ex )
         {
@@ -742,7 +778,7 @@ public class PdfMojo
 
     /**
      * Return the directory for a given Locale and the current default Locale.
-     *
+     * 
      * @param basedir the base directory
      * @param locale a Locale.
      * @return File.
@@ -844,7 +880,7 @@ public class PdfMojo
 
     /**
      * Parse the decoration model to find the skin artifact and copy its resources to the output dir.
-     *
+     * 
      * @param locale not null
      * @throws MojoExecutionException if any
      * @see #getDefaultDecorationModel()
@@ -902,7 +938,7 @@ public class PdfMojo
 
     /**
      * Construct a default producer.
-     *
+     * 
      * @return A String in the form <code>Maven PDF Plugin v. 1.1.1, 'fo' implementation</code>.
      */
     private String getDefaultGenerator()
@@ -912,7 +948,7 @@ public class PdfMojo
 
     /**
      * Write the auto-generated model to disc.
-     *
+     * 
      * @param docModel the model to write.
      */
     private void debugLogGeneratedModel( final DocumentModel docModel )
@@ -950,9 +986,9 @@ public class PdfMojo
     }
 
     /**
-     * Generate all Maven reports defined in <code>${project.reporting}</code> part
-     * only if <code>generateReports</code> is enabled.
-     *
+     * Generate all Maven reports defined in <code>${project.reporting}</code> part only if <code>generateReports</code>
+     * is enabled.
+     * 
      * @param locale not null
      * @throws MojoExecutionException if any
      * @throws IOException if any
@@ -985,22 +1021,22 @@ public class PdfMojo
                 for ( final Iterator it2 = reportPlugin.getReportSets().iterator(); it2.hasNext(); )
                 {
                     final ReportSet reportSet = (ReportSet) it2.next();
-    
+
                     for ( final Iterator it3 = reportSet.getReports().iterator(); it3.hasNext(); )
                     {
                         goals.add( it3.next().toString() );
                     }
                 }
-    
+
                 List mojoDescriptors = pluginDescriptor.getMojos();
                 for ( final Iterator it2 = mojoDescriptors.iterator(); it2.hasNext(); )
                 {
                     final MojoDescriptor mojoDescriptor = (MojoDescriptor) it2.next();
-    
+
                     if ( goals.isEmpty() || ( !goals.isEmpty() && goals.contains( mojoDescriptor.getGoal() ) ) )
                     {
                         MavenReport report = getMavenReport( mojoDescriptor );
-    
+
                         generateMavenReport( mojoDescriptor, report, locale );
                     }
                 }
@@ -1035,6 +1071,7 @@ public class PdfMojo
 
     /**
      * TODO olamy : remove when maven 3 will be the de facto standard :-)
+     * 
      * @param reportPlugin not null
      * @return the PluginDescriptor instance for the given reportPlugin.
      * @throws MojoExecutionException if any
@@ -1099,8 +1136,7 @@ public class PdfMojo
         ClassLoader oldClassLoader = Thread.currentThread().getContextClassLoader();
         try
         {
-            Thread.currentThread()
-                  .setContextClassLoader( mojoDescriptor.getPluginDescriptor().getClassRealm().getClassLoader() );
+            Thread.currentThread().setContextClassLoader( mojoDescriptor.getPluginDescriptor().getClassRealm().getClassLoader() );
 
             MojoExecution mojoExecution = new MojoExecution( mojoDescriptor );
 
@@ -1130,7 +1166,7 @@ public class PdfMojo
 
     /**
      * Generate the given Maven report only if it is not an external report and the report could be generated.
-     *
+     * 
      * @param mojoDescriptor not null, to catch linkage error
      * @param report could be null
      * @param locale not null
@@ -1192,8 +1228,8 @@ public class PdfMojo
         if ( !locale.getLanguage().equals( defaultLocale.getLanguage() ) )
         {
             files =
-                FileUtils.getFileNames( new File( siteDirectory, locale.getLanguage() ), "*/"
-                    + report.getOutputName() + ".*", excludes, false );
+                FileUtils.getFileNames( new File( siteDirectory, locale.getLanguage() ), "*/" + report.getOutputName()
+                    + ".*", excludes, false );
         }
 
         if ( files.size() != 0 )
@@ -1202,10 +1238,8 @@ public class PdfMojo
 
             if ( getLog().isInfoEnabled() )
             {
-                getLog().info(
-                               "Skipped \"" + report.getName( locale ) + "\" report, file \""
-                                   + report.getOutputName() + "\" already exists for the " + displayLanguage
-                                   + " version." );
+                getLog().info( "Skipped \"" + report.getName( locale ) + "\" report, file \"" + report.getOutputName()
+                                   + "\" already exists for the " + displayLanguage + " version." );
             }
 
             return;
@@ -1222,9 +1256,10 @@ public class PdfMojo
         try
         {
             sink = new PdfSink( sw );
-            org.codehaus.doxia.sink.Sink proxy = (org.codehaus.doxia.sink.Sink) Proxy.newProxyInstance(
-                org.codehaus.doxia.sink.Sink.class.getClassLoader(),
-                new Class[] { org.codehaus.doxia.sink.Sink.class }, new SinkDelegate( sink ) );
+            org.codehaus.doxia.sink.Sink proxy =
+                (org.codehaus.doxia.sink.Sink) Proxy.newProxyInstance( org.codehaus.doxia.sink.Sink.class.getClassLoader(),
+                                                                       new Class[] { org.codehaus.doxia.sink.Sink.class },
+                                                                       new SinkDelegate( sink ) );
             report.generate( proxy, locale );
         }
         catch ( MavenReportException e )
@@ -1238,8 +1273,7 @@ public class PdfMojo
                 ClassRealm reportPluginRealm = mojoDescriptor.getPluginDescriptor().getClassRealm();
                 StringBuilder sb = new StringBuilder( 1024 );
                 sb.append( report.getClass().getName() ).append( "#generate(...) caused a linkage error (" );
-                sb.append( e.getClass().getName() )
-                        .append( ") and may be out-of-date. Check the realms:" ).append( EOL );
+                sb.append( e.getClass().getName() ).append( ") and may be out-of-date. Check the realms:" ).append( EOL );
                 sb.append( "Maven Report Plugin realm = " ).append( reportPluginRealm.getId() ).append( EOL );
                 for ( int i = 0; i < reportPluginRealm.getConstituents().length; i++ )
                 {
@@ -1295,6 +1329,7 @@ public class PdfMojo
 
     /**
      * Append generated reports to the toc only if <code>generateReports</code> is enabled, for instance:
+     * 
      * <pre>
      * &lt;item name="Project Reports" ref="/project-info"&gt;
      * &nbsp;&nbsp;&lt;item name="Project License" ref="/license" /&gt;
@@ -1303,7 +1338,7 @@ public class PdfMojo
      * &nbsp;&nbsp;...
      * &lt;/item&gt;
      * </pre>
-     *
+     * 
      * @param model not null
      * @param locale not null
      * @see #generateMavenReports(Locale)
@@ -1322,7 +1357,8 @@ public class PdfMojo
 
         final DocumentTOCItem documentTOCItem = new DocumentTOCItem();
         documentTOCItem.setName( i18n.getString( "pdf-plugin", locale, "toc.project-info.item" ) );
-        documentTOCItem.setRef( "/project-info" ); // see #generateMavenReports(Locale)
+        documentTOCItem.setRef( "/project-info" ); // see
+                                                   // #generateMavenReports(Locale)
 
         List addedRef = new ArrayList( 4 );
 
@@ -1360,8 +1396,7 @@ public class PdfMojo
                 {
                     final String generatedDir = it.next().toString();
 
-                    List generatedFiles =
-                        FileUtils.getFileNames( new File( generatedDir ), "**.*", excludes, false );
+                    List generatedFiles = FileUtils.getFileNames( new File( generatedDir ), "**.*", excludes, false );
 
                     for ( final Iterator it2 = generatedFiles.iterator(); it2.hasNext(); )
                     {
@@ -1370,8 +1405,7 @@ public class PdfMojo
 
                         if ( !addedRef.contains( ref ) )
                         {
-                            final String title =
-                                getGeneratedDocumentTitle( new File( generatedDir, generatedFile ) );
+                            final String title = getGeneratedDocumentTitle( new File( generatedDir, generatedFile ) );
 
                             if ( title != null )
                             {
@@ -1399,7 +1433,7 @@ public class PdfMojo
 
     /**
      * Parse a generated Doxia file and returns its title.
-     *
+     * 
      * @param f not null
      * @return the xdoc file title or null if an error occurs.
      * @throws IOException if any
@@ -1440,15 +1474,14 @@ public class PdfMojo
 
     /**
      * Parsing the generated report to see if it is correct or not. Log the error for the user.
-     *
+     * 
      * @param mojoDescriptor not null
      * @param generatedReport not null
      * @param localReportName not null
      * @return <code>true</code> if Doxia is able to parse the generated report, <code>false</code> otherwise.
      * @since 1.1
      */
-    private boolean isValidGeneratedReport( MojoDescriptor mojoDescriptor, File generatedReport,
-                                            String localReportName )
+    private boolean isValidGeneratedReport( MojoDescriptor mojoDescriptor, File generatedReport, String localReportName )
     {
         SinkAdapter sinkAdapter = new SinkAdapter();
         Reader reader = null;
@@ -1525,8 +1558,7 @@ public class PdfMojo
                 }
             }
 
-            sb.append( EOL ).append( "Ignoring the \"" ).append( localReportName )
-                    .append( "\" report in the PDF." ).append( EOL );
+            sb.append( EOL ).append( "Ignoring the \"" ).append( localReportName ).append( "\" report in the PDF." ).append( EOL );
 
             getLog().error( sb.toString() );
             getLog().debug( e );
@@ -1563,8 +1595,7 @@ public class PdfMojo
     private MavenProject getReportPluginProject( PluginDescriptor pluginDescriptor )
     {
         Artifact artifact =
-            artifactFactory.createProjectArtifact( pluginDescriptor.getGroupId(),
-                                                   pluginDescriptor.getArtifactId(),
+            artifactFactory.createProjectArtifact( pluginDescriptor.getGroupId(), pluginDescriptor.getArtifactId(),
                                                    pluginDescriptor.getVersion(), Artifact.SCOPE_COMPILE );
         try
         {
@@ -1584,11 +1615,10 @@ public class PdfMojo
     // ----------------------------------------------------------------------
 
     /**
-     * Write the given content to the given file.
-     * <br/>
+     * Write the given content to the given file. <br/>
      * <b>Note</b>: try also to fix the content due to some issues in
      * {@link org.apache.maven.reporting.AbstractMavenReport}.
-     *
+     * 
      * @param content the given content
      * @param toFile the report file
      * @throws IOException if any
@@ -1644,7 +1674,7 @@ public class PdfMojo
 
     /**
      * A sink to generate a Maven report as xdoc with some known workarounds.
-     *
+     * 
      * @since 1.1
      */
     private static class PdfSink
@@ -1660,21 +1690,23 @@ public class PdfMojo
         {
             super.table();
 
-            // workaround to fix reporting-impl issue, no call of tableRows( justification, grid )
+            // workaround to fix reporting-impl issue, no call of tableRows(
+            // justification, grid )
             writeStartTag( HtmlMarkup.TABLE );
         }
 
         /** {@inheritDoc} */
         public void text( String text )
         {
-            // workaround to fix quotes introduced with MPIR-59 (then removed in MPIR-136)
+            // workaround to fix quotes introduced with MPIR-59 (then removed in
+            // MPIR-136)
             super.text( StringUtils.replace( text, "\u0092", "'" ) );
         }
     }
 
     /**
      * Renderer Maven report similar to org.apache.maven.plugins.site.CategorySummaryDocumentRenderer
-     *
+     * 
      * @since 1.1
      */
     private static class ProjectInfoRenderer
@@ -1777,7 +1809,7 @@ public class PdfMojo
     /**
      * Delegates the method invocations on <code>org.codehaus.doxia.sink.Sink@maven-core-realm</code> to
      * <code>org.apache.maven.doxia.sink.Sink@pdf-plugin-realm</code>.
-     *
+     * 
      * @author Benjamin Bentmann
      */
     private static class SinkDelegate
