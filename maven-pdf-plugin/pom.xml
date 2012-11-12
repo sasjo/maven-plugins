@@ -65,6 +65,20 @@ under the License.
     <mavenVersion>2.0.9</mavenVersion>
     <mavenPluginVersion>3.1</mavenPluginVersion>
   </properties>
+  
+  <distributionManagement>
+    <repository>
+      <id>remote-repository</id>
+      <name>Extenda Releases</name>
+      <url>http://repository/nexus/content/repositories/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>remote-repository</id>
+      <name>Extenda Snapshots</name>
+      <url>http://repository/nexus/content/repositories/snapshots</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
+  </distributionManagement>  
 
   <dependencies>
     <!-- maven -->
